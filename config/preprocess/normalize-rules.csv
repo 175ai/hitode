@@ -1,1 +1,2 @@
 id,enabled,pattern,replacement,priority,note
+normalize_whitespace,true,\s+, ,90,余分な空白を単一スペースに正規化

@@ -1,4 +1,4 @@
-import { analyzeText } from './pipeline/kuromoji/analyzer.js';
+import { analyzePatentText } from './pipeline/index.js';
 import { createAppView, renderResults, setStatus } from './ui/app-view.js';
 
 const app = document.querySelector('#app');
@@ -12,8 +12,8 @@ if (app) {
     setStatus(view.status, '解析中…');
 
     try {
-      const tokens = await analyzeText(text);
-      renderResults(view.resultOutput, view.resultCount, tokens);
+      const result = await analyzePatentText(text);
+      renderResults(view.resultOutput, view.resultCount, result);
       setStatus(view.status, '解析が完了しました。');
     } catch (error) {
       view.resultOutput.innerHTML = '<p class="empty-state">解析に失敗しました。</p>';

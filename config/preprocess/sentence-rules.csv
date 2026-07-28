@@ -1,1 +1,2 @@
 id,enabled,pattern,replacement,priority,note
+claim_frame_deatte,true,([^。]*?であって、[^。]*。),claim_frame,10,請求項の構文「〇〇であって、〜〇〇。」を検出

@@ -1,0 +1,7 @@
+id,enabled,scope,pattern,replacement,priority,note
+verb_dep_ni,true,verb_dependency,に,ni_case,10,〇〇に〇〇する の係り受け
+verb_dep_wo,true,verb_dependency,を,wo_case,20,〇〇を〇〇する の係り受け
+verb_dep_ga,true,verb_dependency,が,ga_case,30,〇〇が〇〇される の係り受け
+verb_dep_kara,true,verb_dependency,から,kara_case,35,〇〇から〇〇する の係り受け
+noun_dep_no,true,noun_dependency,の,no_case,40,〇〇の〇〇 の係り受け
+noun_dep_na,true,noun_dependency,な,na_case,50,〇〇な〇〇 の係り受け
