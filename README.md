@@ -2,6 +2,10 @@
 
 Single-page static web app for patent text structural analysis using kuromoji.js and editable CSV rules.
 
+## デモページ
+
+- GitHub Pages: https://175ai.github.io/hitode/
+
 ## kuromoji.js 利用時の注意点
 
 - `file://` 直開きでは動作しません。辞書ファイル (`*.dat.gz`) の取得が必要なため、必ずローカルサーバまたは GitHub Pages 上で実行してください。
