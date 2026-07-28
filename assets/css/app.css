@@ -1,8 +1,141 @@
 :root {
   color-scheme: light;
+  --bg: #f4f7fb;
+  --panel: #ffffff;
+  --accent: #2457d5;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #d7e2f2;
 }
 
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.app-shell {
+  display: grid;
+  gap: 20px;
+}
+
+.hero,
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+h1,
+h2 {
+  margin: 0 0 8px;
+}
+
+.hero-copy {
+  margin: 0;
+  color: var(--muted);
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  font: inherit;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #e5ecfb;
+  color: var(--accent);
+}
+
+.status {
+  margin: 12px 0 0;
+  color: var(--muted);
+}
+
+.status.error {
+  color: #b91c1c;
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.result-count {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.result-output {
+  min-height: 120px;
+}
+
+.empty-state {
+  margin: 0;
+  color: var(--muted);
+}
+
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.token-table th,
+.token-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.token-table th {
+  color: var(--muted);
+  font-weight: 700;
 }

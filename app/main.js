@@ -1,5 +1,37 @@
+import { analyzeText } from './pipeline/kuromoji/analyzer.js';
+import { createAppView, renderResults, setStatus } from './ui/app-view.js';
+
 const app = document.querySelector('#app');
 
 if (app) {
-  app.innerHTML = '<h1>hitode-特許文書解析器</h1>';
+  const view = createAppView();
+  app.appendChild(view.root);
+
+  const runAnalysis = async () => {
+    const text = view.input.value;
+    setStatus(view.status, '解析中…');
+
+    try {
+      const tokens = await analyzeText(text);
+      renderResults(view.resultOutput, view.resultCount, tokens);
+      setStatus(view.status, '解析が完了しました。');
+    } catch (error) {
+      view.resultOutput.innerHTML = '<p class="empty-state">解析に失敗しました。</p>';
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(view.status, message, true);
+    }
+  };
+
+  view.analyzeButton.addEventListener('click', runAnalysis);
+  view.sampleButton.addEventListener('click', () => {
+    view.input.value = '特許文書解析器で入力したテキストを形態素解析します。';
+    setStatus(view.status, 'サンプルを読み込みました。');
+  });
+
+  view.input.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      runAnalysis();
+    }
+  });
 }
