@@ -262,6 +262,32 @@ function extractNounSuruCompounds(tokens) {
   return compounds;
 }
 
+function extractConsecutiveNounCompounds(tokens) {
+  const compounds = [];
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (!isNoun(tokens[index])) {
+      continue;
+    }
+
+    const sequence = collectNounSequence(tokens, index);
+    if (sequence.tokens.length < 2) {
+      continue;
+    }
+
+    compounds.push({
+      type: 'consecutive_nouns',
+      start: index,
+      end: sequence.endIndex - 1,
+      expression: joinSurface(sequence.tokens)
+    });
+
+    index = sequence.endIndex - 1;
+  }
+
+  return compounds;
+}
+
 function extractVerbDependencies(tokens, patterns) {
   const dependencies = [];
 
@@ -464,13 +490,17 @@ export async function runPostprocess(tokens) {
     ? extractNounSuruCompounds(tokens)
     : [];
 
+  const consecutiveNounCompounds = compoundRules.some((rule) => asBoolean(rule.enabled) && rule.id === 'consecutive_nouns')
+    ? extractConsecutiveNounCompounds(tokens)
+    : [];
+
   const verbDependencies = extractVerbDependencies(tokens, dependencyRules);
   const nounDependencies = extractNounDependencies(tokens, dependencyRules);
   const verbGraph = buildVerbDependencyGraph(verbDependencies);
   const graphCoverage = buildGraphCoverage(tokens, verbDependencies);
 
   return {
-    compounds: [...prefixNounCompounds, ...nounSuruCompounds],
+    compounds: [...prefixNounCompounds, ...nounSuruCompounds, ...consecutiveNounCompounds],
     verbDependencies,
     nounDependencies,
     verbGraph,

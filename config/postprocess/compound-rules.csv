@@ -1,3 +1,4 @@
 id,enabled,scope,pattern,replacement,priority,note
 prefix_noun,true,compound,接頭詞+名詞,compound_noun,10,接頭詞と連続名詞を複合名詞として抽出
 noun_suru,true,compound,名詞+する,compound_verb,20,名詞+する系の複合動詞を抽出
+consecutive_nouns,true,compound,名詞連続,compound_noun,30,名詞が連続する場合に複合名詞として抽出
