@@ -1,4 +1,4 @@
-const sampleText = '特許文書解析器で入力したテキストを形態素解析します。';
+const sampleText = '入力されたテキストを形態素解析し、複合語を抽出し、助詞に着目して係り受け構造を解析します。';
 
 export function createAppView() {
   const root = document.createElement('div');

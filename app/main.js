@@ -47,7 +47,7 @@ if (app) {
   });
 
   view.sampleButton.addEventListener('click', () => {
-    view.input.value = '特許文書解析器で入力したテキストを形態素解析します。';
+    view.input.value = '入力されたテキストを形態素解析し、複合語を抽出し、助詞に着目して係り受け構造を解析します。';
     setStatus(view.status, 'サンプルを読み込みました。');
   });
 
