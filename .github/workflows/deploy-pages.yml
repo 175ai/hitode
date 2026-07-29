@@ -31,7 +31,7 @@ jobs:
       - name: Prepare static artifact
         run: |
           mkdir -p _site
-          cp -R index.html help.html app assets vendor _site/
+          cp -R index.html help.html app assets vendor config _site/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
