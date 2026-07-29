@@ -1,6 +1,7 @@
 import { getAppBasePath } from '../../utils/base-path.js';
 
 let tokenizerPromise = null;
+let preloadPromise = null;
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -38,40 +39,59 @@ function resolveLocalKuromojiPath() {
   return `${basePath}vendor/kuromoji/kuromoji.js`;
 }
 
+async function buildTokenizer() {
+  if (!window.kuromoji) {
+    try {
+      await loadScript(resolveLocalKuromojiPath());
+    } catch (_localError) {
+      await loadScript('https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js');
+    }
+  }
+
+  if (!window.kuromoji) {
+    throw new Error('kuromoji.js を読み込めませんでした。');
+  }
+
+  return new Promise((resolve, reject) => {
+    window.kuromoji.builder({ dicPath: resolveDictionaryPath() }).build((error, tokenizer) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(tokenizer);
+    });
+  });
+}
+
 async function getTokenizer() {
   if (tokenizerPromise) {
     return tokenizerPromise;
   }
 
-  tokenizerPromise = (async () => {
-    if (!window.kuromoji) {
-      try {
-        await loadScript(resolveLocalKuromojiPath());
-      } catch (_localError) {
-        await loadScript('https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js');
-      }
-    }
-
-    if (!window.kuromoji) {
-      throw new Error('kuromoji.js を読み込めませんでした。');
-    }
-
-    return new Promise((resolve, reject) => {
-      window.kuromoji.builder({ dicPath: resolveDictionaryPath() }).build((error, tokenizer) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(tokenizer);
-      });
-    });
-  })();
+  tokenizerPromise = buildTokenizer();
 
   try {
     return await tokenizerPromise;
   } catch (error) {
     tokenizerPromise = null;
+    throw error;
+  }
+}
+
+export async function preloadAnalyzerResources() {
+  if (preloadPromise) {
+    return preloadPromise;
+  }
+
+  preloadPromise = (async () => {
+    await getTokenizer();
+  })();
+
+  try {
+    return await preloadPromise;
+  } catch (error) {
+    preloadPromise = null;
     throw error;
   }
 }
