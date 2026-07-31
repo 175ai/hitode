@@ -5,17 +5,29 @@ const DEFAULT_CSV_CONFIGS = {
 normalize_whitespace,true,\\s+, ,90,余分な空白を単一スペースに正規化`,
   'config/preprocess/sentence-rules.csv': `id,enabled,pattern,replacement,priority,note
 claim_frame_deatte,true,([^。]*?であって、[^。]*。),claim_frame,10,請求項の構文「〇〇であって、〜〇〇。」を検出`,
+  'config/preprocess/stopwords.csv': `word,enabled,note
+`,
+  'config/kuromoji/token-filters.csv': `id,enabled,part_of_speech,action,priority,note
+drop_symbols,false,記号,drop,10,必要に応じて記号を除去`,
+  'config/kuromoji/compound-rules.csv': `id,enabled,pattern,surface,pos,base,priority,note
+`,
   'config/postprocess/compound-rules.csv': `id,enabled,scope,pattern,replacement,priority,note
-prefix_noun,true,compound,接頭詞+名詞,compound_noun,10,接頭詞と連続名詞を複合名詞として抽出
-noun_suru,true,compound,名詞+する,compound_verb,20,名詞+する系の複合動詞を抽出
-consecutive_nouns,true,compound,名詞連続,compound_noun,30,名詞が連続する場合に複合名詞として抽出`,
-  'config/postprocess/dependency-rules.csv': `id,enabled,scope,pattern,replacement,priority,note
-verb_dep_ni,true,verb_dependency,に,ni_case,10,〇〇に〇〇する の係り受け
-verb_dep_wo,true,verb_dependency,を,wo_case,20,〇〇を〇〇する の係り受け
-verb_dep_ga,true,verb_dependency,が,ga_case,30,〇〇が〇〇される の係り受け
-verb_dep_kara,true,verb_dependency,から,kara_case,35,〇〇から〇〇する の係り受け
-noun_dep_no,true,noun_dependency,の,no_case,40,〇〇の〇〇 の係り受け
-noun_dep_na,true,noun_dependency,な,na_case,50,〇〇な〇〇 の係り受け`
+compound_prefix_noun,true,<pos=接頭詞><pos=名詞>+,compound_noun,10,接頭詞+名詞連続を抽出
+compound_noun_suru,true,<pos=名詞>+<pos=動詞 base=する>,compound_verb,20,名詞+するを抽出
+compound_noun_chain,true,"<pos=名詞>{2,}",compound_noun,30,名詞連続を抽出`,
+  'config/postprocess/dependency-rules.csv': `id,enabled,kind,pattern,type,priority,note
+verb_dep_wo,true,verb,(?<source><pos=接頭詞|名詞>+)(?<particle><pos=助詞 surface=を>)(?<predicate><pos=名詞>*<pos=動詞 base=する>),wo_case,10,を格の係り受け
+verb_dep_ni,true,verb,(?<source><pos=接頭詞|名詞>+)(?<particle><pos=助詞 surface=に>)(?<predicate><pos=名詞>*<pos=動詞 base=する>),ni_case,20,に格の係り受け
+verb_dep_ga,true,verb,(?<source><pos=接頭詞|名詞>+)(?<particle><pos=助詞 surface=が>)(?<predicate><pos=名詞>*<pos=動詞>),ga_case,30,が格の係り受け
+noun_dep_no,true,noun,(?<source><pos=名詞>+)(?<connector><pos=助詞 surface=の>)(?<target><pos=名詞>+),no_case,40,の連体係り受け
+noun_dep_na,true,noun,(?<source><pos=名詞|形容詞>+)(?<connector><pos=助詞 surface=な>)(?<target><pos=名詞>+),na_case,50,な連体係り受け`,
+  'config/postprocess/label-rules.csv': `id,enabled,target,pattern,label,priority,note
+label_parse,true,verb_dependency,解析する$,解析アクション,10,語尾が解析するの結果にラベル付与
+label_extract,true,verb_dependency,抽出する$,抽出アクション,20,語尾が抽出するの結果にラベル付与`,
+  'config/postprocess/display-rules.csv': `id,enabled,target,pattern,template,priority,note
+display_compound,true,compound,.*, {type} | {expression},10,複合語表示
+display_verb_dep,true,verb_dependency,.*, {source} | {particle} | {predicate},10,動詞係り受け表示
+display_noun_dep,true,noun_dependency,.*, {source} | {connector} | {target},10,名詞係り受け表示`
 };
 
 function parseCsvLine(line) {

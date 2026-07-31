@@ -1,1 +1,2 @@
 id,enabled,part_of_speech,action,priority,note
+drop_symbols,false,記号,drop,10,必要に応じて記号を除去

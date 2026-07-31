@@ -1,1 +1,4 @@
-id,enabled,pattern,display,priority,note
+id,enabled,target,pattern,template,priority,note
+display_compound,true,compound,.*,"{type} | {expression}",10,複合語表示
+display_verb_dep,true,verb_dependency,.*,"{source} | {particle} | {predicate}",10,動詞係り受け表示
+display_noun_dep,true,noun_dependency,.*,"{source} | {connector} | {target}",10,名詞係り受け表示

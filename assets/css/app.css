@@ -169,52 +169,8 @@ button.secondary {
   padding-left: 20px;
 }
 
-.graph-summary {
-  margin-top: 12px;
-}
-
-.graph-list {
-  margin-top: 8px;
-}
-
-.review-panel {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
-  background: #f8fbff;
-}
-
-.review-panel h3 {
-  margin: 0 0 10px;
-}
-
-.segmented-text,
-.coverage-summary,
-.coverage-legend {
+.segmented-text {
   margin: 0 0 8px;
-}
-
-.coverage-legend {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.coverage-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.coverage-token {
-  font-weight: 600;
-}
-
-.coverage-token.adopted {
-  color: #1d4ed8;
-}
-
-.coverage-token.ignored {
-  color: #9ca3af;
 }
 
 .empty-state {

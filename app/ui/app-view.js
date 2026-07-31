@@ -203,7 +203,8 @@ export function renderResults(output, countLabel, tokens) {
       const list = document.createElement('ul');
       compounds.forEach((item) => {
         const li = document.createElement('li');
-        li.textContent = `${item.type} | ${item.expression}`;
+        const display = item.display || `${item.type} | ${item.expression}`;
+        li.textContent = item.label ? `${display} [${item.label}]` : display;
         list.appendChild(li);
       });
       panel.appendChild(list);
@@ -231,7 +232,8 @@ export function renderResults(output, countLabel, tokens) {
       const verbList = document.createElement('ul');
       verbDependencies.forEach((item) => {
         const li = document.createElement('li');
-        li.textContent = `${item.particle} | ${item.expression}`;
+        const display = item.display || `${item.particle} | ${item.expression}`;
+        li.textContent = item.label ? `${display} [${item.label}]` : display;
         verbList.appendChild(li);
       });
       panel.appendChild(verbList);
@@ -245,7 +247,8 @@ export function renderResults(output, countLabel, tokens) {
       const nounList = document.createElement('ul');
       nounDependencies.forEach((item) => {
         const li = document.createElement('li');
-        li.textContent = `${item.connector} | ${item.expression}`;
+        const display = item.display || `${item.connector} | ${item.expression}`;
+        li.textContent = item.label ? `${display} [${item.label}]` : display;
         nounList.appendChild(li);
       });
       panel.appendChild(nounList);
@@ -259,39 +262,6 @@ export function renderResults(output, countLabel, tokens) {
     }
   });
 
-  registerSection('postprocess-graph', '後処理: 有向グラフ', (panel) => {
-    const title = document.createElement('h3');
-    title.textContent = '後処理: 有向グラフ';
-    panel.appendChild(title);
-
-    const graph = !Array.isArray(tokens) ? tokens?.postprocess?.verbGraph : null;
-    if (graph) {
-      const summary = document.createElement('p');
-      summary.className = 'graph-summary';
-      summary.textContent = `ノード: ${graph.nodes.length} / エッジ: ${graph.edges.length}`;
-      panel.appendChild(summary);
-
-      if (graph.edges.length) {
-        const nodeLabelById = new Map(graph.nodes.map((node) => [node.id, node.label]));
-        const list = document.createElement('ul');
-        list.className = 'graph-list';
-        graph.edges.forEach((edge) => {
-          const li = document.createElement('li');
-          const fromLabel = nodeLabelById.get(edge.from) || edge.from;
-          const toLabel = nodeLabelById.get(edge.to) || edge.to;
-          li.textContent = `${fromLabel} → ${toLabel} [${edge.label}]`;
-          list.appendChild(li);
-        });
-        panel.appendChild(list);
-      }
-    } else {
-      const empty = document.createElement('p');
-      empty.className = 'empty-state';
-      empty.textContent = '有向グラフはありません。';
-      panel.appendChild(empty);
-    }
-  });
-
   registerSection('postprocess-review', '後処理: 分かち書きレビュー', (panel) => {
     const title = document.createElement('h3');
     title.textContent = '後処理: 分かち書きレビュー';
@@ -301,29 +271,33 @@ export function renderResults(output, countLabel, tokens) {
     segmentedText.className = 'segmented-text';
     segmentedText.textContent = `分かち書き: ${reviewTokenList.map((token) => token.surfaceForm).join(' ')}`;
     panel.appendChild(segmentedText);
+  });
 
-    const coverage = !Array.isArray(tokens) ? tokens?.postprocess?.graphCoverage : null;
-    if (coverage?.tokenCoverage?.length) {
-      const coverageSummary = document.createElement('p');
-      coverageSummary.className = 'coverage-summary';
-      coverageSummary.textContent = `有向グラフ採用: ${coverage.adoptedCount} / ${coverage.totalCount} 形態素`;
-      panel.appendChild(coverageSummary);
+  registerSection('rule-errors', 'ルール検証', (panel) => {
+    const title = document.createElement('h3');
+    title.textContent = 'ルール検証';
+    panel.appendChild(title);
 
-      const coverageLegend = document.createElement('p');
-      coverageLegend.className = 'coverage-legend';
-      coverageLegend.textContent = '青: 有向グラフに採用 / グレー: 未採用';
-      panel.appendChild(coverageLegend);
+    const errors = !Array.isArray(tokens) ? (tokens?.ruleErrors ?? []) : [];
+    const summary = document.createElement('p');
+    summary.textContent = `エラー件数: ${errors.length} 件`;
+    panel.appendChild(summary);
 
-      const coverageLine = document.createElement('div');
-      coverageLine.className = 'coverage-line';
-      coverage.tokenCoverage.forEach((item) => {
-        const tokenChip = document.createElement('span');
-        tokenChip.className = item.adopted ? 'coverage-token adopted' : 'coverage-token ignored';
-        tokenChip.textContent = item.surfaceForm;
-        coverageLine.appendChild(tokenChip);
-      });
-      panel.appendChild(coverageLine);
+    if (!errors.length) {
+      const ok = document.createElement('p');
+      ok.className = 'empty-state';
+      ok.textContent = '無効なルールはありません。';
+      panel.appendChild(ok);
+      return;
     }
+
+    const list = document.createElement('ul');
+    errors.forEach((error) => {
+      const item = document.createElement('li');
+      item.textContent = `${error.file} | ${error.ruleId} | ${error.message}`;
+      list.appendChild(item);
+    });
+    panel.appendChild(list);
   });
 
   container.appendChild(nav);

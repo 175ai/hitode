@@ -1,1 +1,2 @@
-id,enabled,pattern,replacement,priority,note
+id,enabled,pattern,surface,pos,base,priority,note
+merge_kakariuke_kozo,false,<surface=係り受け><surface=構造>,係り受け構造,名詞,係り受け構造,10,分割された語を結合

@@ -33,7 +33,11 @@ if (app) {
     try {
       const result = await analyzePatentText(text);
       renderResults(view.resultOutput, view.resultCount, result);
-      setStatus(view.status, '解析が完了しました。');
+      if (Array.isArray(result.ruleErrors) && result.ruleErrors.length > 0) {
+        setStatus(view.status, `解析は完了しましたが、無効なルールが ${result.ruleErrors.length} 件あります。`, true);
+      } else {
+        setStatus(view.status, '解析が完了しました。');
+      }
     } catch (error) {
       view.resultOutput.innerHTML = '<p class="empty-state">解析に失敗しました。</p>';
       const message = error instanceof Error ? error.message : String(error);

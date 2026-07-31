@@ -1,509 +1,281 @@
 import { loadCsvConfig } from '../../utils/csv-loader.js';
+import {
+  compileTokenPattern,
+  findPatternMatches,
+  getCapturedRange,
+  tokensToSurface
+} from '../rules/token-pattern.js';
 
 function asBoolean(value) {
   return String(value).toLowerCase() === 'true' || value === '1';
+}
+
+function toPriority(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
+function sortRules(rules) {
+  return rules
+    .filter((rule) => asBoolean(rule.enabled))
+    .sort((left, right) => toPriority(left.priority) - toPriority(right.priority));
+}
+
+function sliceTokens(tokens, range) {
+  if (!range || !Number.isInteger(range.start) || !Number.isInteger(range.end)) {
+    return [];
+  }
+
+  if (range.end <= range.start) {
+    return [];
+  }
+
+  return tokens.slice(range.start, range.end);
 }
 
 function joinSurface(tokens) {
   return tokens.map((token) => token.surfaceForm).join('');
 }
 
-function isNoun(token) {
-  if (!token) {
-    return false;
-  }
-
-  return token.pos === '名詞';
-}
-
-function isPrefix(token) {
-  if (!token) {
-    return false;
-  }
-
-  return token.pos === '接頭詞';
-}
-
-function isParticle(token, particle) {
-  if (!token) {
-    return false;
-  }
-
-  return token.pos === '助詞' && token.surfaceForm === particle;
-}
-
-function isSuruVerb(token) {
-  if (!token) {
-    return false;
-  }
-
-  if (token.pos !== '動詞') {
-    return false;
-  }
-
-  return token.basicForm === 'する' || token.surfaceForm.startsWith('し');
-}
-
-function isPhraseToken(token) {
-  if (!token) {
-    return false;
-  }
-
-  return token.pos === '名詞' || token.pos === '接頭詞' || token.pos === '形容詞';
-}
-
-function isParticleConnectorToken(token) {
-  if (!token) {
-    return false;
-  }
-
-  return token.pos === '助詞' && (token.surfaceForm === 'の' || token.surfaceForm === 'な');
-}
-
-function isPhraseBoundary(token) {
-  if (!token) {
-    return true;
-  }
-
-  if (token.pos === '記号' || token.pos === '接続詞' || token.pos === '助動詞') {
-    return true;
-  }
-
-  if (token.pos === '助詞' && !isParticleConnectorToken(token)) {
-    return true;
-  }
-
-  return false;
-}
-
-function collectArgumentPhrase(tokens, particleIndex) {
-  let startIndex = particleIndex - 1;
-
-  while (startIndex >= 0 && !isPhraseBoundary(tokens[startIndex]) && (isPhraseToken(tokens[startIndex]) || isParticleConnectorToken(tokens[startIndex]))) {
-    startIndex -= 1;
-  }
-
-  const tokenIndices = [];
-  const phraseTokens = [];
-
-  for (let index = startIndex + 1; index < particleIndex; index += 1) {
-    if (!tokens[index]) {
-      continue;
-    }
-
-    phraseTokens.push(tokens[index]);
-    tokenIndices.push(index);
-  }
-
-  return {
-    startIndex: startIndex + 1,
-    tokenIndices,
-    tokens: phraseTokens,
-    surface: joinSurface(phraseTokens)
-  };
-}
-
-function findNextVerbIndex(tokens, startIndex) {
-  return findClausePredicateIndex(tokens, startIndex);
-}
-
-function isAuxiliaryLikeVerb(token) {
-  if (!token) {
-    return false;
-  }
-
-  const basicForm = token.basicForm === '-' ? token.surfaceForm : token.basicForm;
-  return ['いる', 'れる', 'せる', 'ある', 'くる', 'ない'].includes(basicForm);
-}
-
-function findClauseEndIndex(tokens, startIndex) {
-  for (let index = startIndex; index < tokens.length; index += 1) {
-    if (tokens[index].pos === '記号' && (tokens[index].surfaceForm === '、' || tokens[index].surfaceForm === '。')) {
-      return index;
-    }
-  }
-
-  return tokens.length;
-}
-
-function findClausePredicateIndex(tokens, startIndex) {
-  const clauseEndIndex = findClauseEndIndex(tokens, startIndex);
-
-  for (let index = clauseEndIndex - 1; index >= startIndex; index -= 1) {
-    const token = tokens[index];
-    if (token.pos === '動詞' && !isAuxiliaryLikeVerb(token)) {
-      return index;
-    }
-  }
-
-  for (let index = clauseEndIndex - 1; index >= startIndex; index -= 1) {
-    if (tokens[index].pos === '動詞') {
-      return index;
-    }
-  }
-
-  return -1;
-}
-
-function findFirstClausePredicateIndex(tokens, startIndex) {
-  const clauseEndIndex = findClauseEndIndex(tokens, startIndex);
-
-  for (let index = startIndex; index < clauseEndIndex; index += 1) {
-    const token = tokens[index];
-    if (token.pos === '動詞' && !isAuxiliaryLikeVerb(token)) {
-      return index;
-    }
-  }
-
-  for (let index = startIndex; index < clauseEndIndex; index += 1) {
-    if (tokens[index].pos === '動詞') {
-      return index;
-    }
-  }
-
-  return -1;
-}
-
-function buildPredicateExpression(tokens, predicateIndex) {
-  const predicate = tokens[predicateIndex];
-  if (!predicate) {
+function normalizePredicate(tokens) {
+  if (!tokens.length) {
     return '';
   }
 
-  const previousToken = tokens[predicateIndex - 1];
-  if (predicate.basicForm === 'する' && previousToken && previousToken.pos === '名詞') {
-    return `${previousToken.surfaceForm}する`;
+  const lastToken = tokens[tokens.length - 1];
+  if (lastToken.basicForm === 'する') {
+    let stemStart = tokens.length - 2;
+    while (stemStart >= 0 && tokens[stemStart].pos === '名詞') {
+      stemStart -= 1;
+    }
+
+    const stemTokens = tokens.slice(stemStart + 1, tokens.length - 1);
+    if (stemTokens.length) {
+      return `${joinSurface(stemTokens)}する`;
+    }
+
+    return 'する';
   }
 
-  return predicate.basicForm && predicate.basicForm !== '-' ? predicate.basicForm : predicate.surfaceForm;
-}
-
-function collectPredicateTokenIndices(tokens, predicateIndex) {
-  const indices = [];
-
-  if (!Number.isInteger(predicateIndex) || predicateIndex < 0 || predicateIndex >= tokens.length) {
-    return indices;
+  if (lastToken.basicForm && lastToken.basicForm !== '-') {
+    return lastToken.basicForm;
   }
 
-  indices.push(predicateIndex);
+  return joinSurface(tokens);
+}
 
-  const predicate = tokens[predicateIndex];
-  const previousToken = tokens[predicateIndex - 1];
-  if (predicate?.basicForm === 'する' && previousToken?.pos === '名詞') {
-    indices.unshift(predicateIndex - 1);
+function compileRulePattern(rule, filePath, stage, ruleErrors) {
+  try {
+    return compileTokenPattern(rule.pattern);
+  } catch (error) {
+    ruleErrors.push({
+      stage,
+      file: filePath,
+      ruleId: rule.id || '(no-id)',
+      message: error instanceof Error ? error.message : String(error)
+    });
+    return null;
   }
-
-  return indices;
 }
 
-function createGraphNodeId(kind, index, text) {
-  return `${kind}:${index}:${text}`;
-}
-
-function collectNounSequence(tokens, startIndex) {
-  const collected = [];
-  let index = startIndex;
-
-  while (index < tokens.length && isNoun(tokens[index])) {
-    collected.push(tokens[index]);
-    index += 1;
-  }
-
-  return {
-    endIndex: index,
-    tokens: collected
-  };
-}
-
-function extractPrefixNounCompounds(tokens) {
+function extractCompounds(tokens, rules, ruleErrors) {
   const compounds = [];
 
-  for (let index = 0; index < tokens.length; index += 1) {
-    const current = tokens[index];
-    if (!isPrefix(current)) {
-      continue;
-    }
-
-    const nounSequence = collectNounSequence(tokens, index + 1);
-    if (!nounSequence.tokens.length) {
-      continue;
-    }
-
-    compounds.push({
-      type: 'prefix_noun',
-      start: index,
-      end: nounSequence.endIndex - 1,
-      expression: joinSurface([current, ...nounSequence.tokens])
-    });
-  }
-
-  return compounds;
-}
-
-function extractNounSuruCompounds(tokens) {
-  const compounds = [];
-
-  for (let index = 0; index < tokens.length - 1; index += 1) {
-    const noun = tokens[index];
-    const verb = tokens[index + 1];
-
-    if (!isNoun(noun) || !isSuruVerb(verb)) {
-      continue;
-    }
-
-    compounds.push({
-      type: 'noun_suru',
-      start: index,
-      end: index + 1,
-      expression: `${noun.surfaceForm}${verb.basicForm === 'する' ? 'する' : verb.surfaceForm}`
-    });
-  }
-
-  return compounds;
-}
-
-function extractConsecutiveNounCompounds(tokens) {
-  const compounds = [];
-
-  for (let index = 0; index < tokens.length; index += 1) {
-    if (!isNoun(tokens[index])) {
-      continue;
-    }
-
-    const sequence = collectNounSequence(tokens, index);
-    if (sequence.tokens.length < 2) {
-      continue;
-    }
-
-    compounds.push({
-      type: 'consecutive_nouns',
-      start: index,
-      end: sequence.endIndex - 1,
-      expression: joinSurface(sequence.tokens)
-    });
-
-    index = sequence.endIndex - 1;
-  }
-
-  return compounds;
-}
-
-function extractVerbDependencies(tokens, patterns) {
-  const dependencies = [];
-
-  patterns.forEach((pattern) => {
-    if (!asBoolean(pattern.enabled) || pattern.scope !== 'verb_dependency') {
+  sortRules(rules).forEach((rule) => {
+    if (!rule.pattern) {
       return;
     }
 
-    const particle = pattern.pattern;
-    if (!particle) {
+    const compiled = compileRulePattern(rule, 'config/postprocess/compound-rules.csv', 'postprocess', ruleErrors);
+    if (!compiled) {
       return;
     }
 
-    for (let index = 0; index < tokens.length - 2; index += 1) {
-      const sourceSequence = collectArgumentPhrase(tokens, index);
-      if (!sourceSequence.tokens.length) {
-        continue;
-      }
+    const matches = findPatternMatches(tokens, compiled, { allowOverlap: false });
+    matches.forEach((match) => {
+      compounds.push({
+        id: rule.id || '(no-id)',
+        type: rule.type || rule.id || 'compound',
+        start: match.start,
+        end: match.end,
+        expression: tokensToSurface(tokens, match.start, match.end + 1)
+      });
+    });
+  });
 
-      const verbIndex = particle === 'が'
-        ? findFirstClausePredicateIndex(tokens, index + 1)
-        : findNextVerbIndex(tokens, index + 1);
-      if (verbIndex < 0) {
-        continue;
-      }
+  return compounds;
+}
 
-      const particleIndex = index;
+function extractDependencies(tokens, rules, ruleErrors) {
+  const verbDependencies = [];
+  const nounDependencies = [];
 
-      if (!isParticle(tokens[particleIndex], particle)) {
-        continue;
-      }
+  sortRules(rules).forEach((rule) => {
+    if (!rule.pattern) {
+      return;
+    }
 
-      const verb = tokens[verbIndex];
-      const predicateExpression = buildPredicateExpression(tokens, verbIndex);
-      const predicateTokenIndices = collectPredicateTokenIndices(tokens, verbIndex);
+    const compiled = compileRulePattern(rule, 'config/postprocess/dependency-rules.csv', 'postprocess', ruleErrors);
+    if (!compiled) {
+      return;
+    }
 
-      dependencies.push({
-        type: pattern.id || 'verb_dependency',
-        particle,
-        source: sourceSequence.surface,
-        sourceIndex: sourceSequence.startIndex,
-        sourceTokenIndices: sourceSequence.tokenIndices,
-        particleIndex,
-        predicateIndex: verbIndex,
-        predicateTokenIndices,
-        predicate: predicateExpression,
-        expression: `${sourceSequence.surface}${particle}${predicateExpression}`,
-        tokens: {
-          source: sourceSequence.tokens,
-          predicate: predicateTokenIndices.map((tokenIndex) => tokens[tokenIndex]).filter(Boolean)
+    const matches = findPatternMatches(tokens, compiled, { allowOverlap: false });
+
+    matches.forEach((match) => {
+      const kind = String(rule.kind || '').trim();
+      const sourceRange = getCapturedRange(match, 'source');
+      const particleRange = getCapturedRange(match, 'particle');
+      const predicateRange = getCapturedRange(match, 'predicate');
+      const connectorRange = getCapturedRange(match, 'connector');
+      const targetRange = getCapturedRange(match, 'target');
+
+      const sourceTokens = sliceTokens(tokens, sourceRange);
+      const particleTokens = sliceTokens(tokens, particleRange);
+      const predicateTokens = sliceTokens(tokens, predicateRange);
+      const connectorTokens = sliceTokens(tokens, connectorRange);
+      const targetTokens = sliceTokens(tokens, targetRange);
+
+      if (kind === 'verb') {
+        if (!sourceTokens.length || !particleTokens.length || !predicateTokens.length) {
+          return;
         }
-      });
-    }
-  });
 
-  return dependencies;
-}
+        const source = joinSurface(sourceTokens);
+        const particle = joinSurface(particleTokens);
+        const predicate = normalizePredicate(predicateTokens);
 
-function extractNounDependencies(tokens, patterns) {
-  const dependencies = [];
-
-  patterns.forEach((pattern) => {
-    if (!asBoolean(pattern.enabled) || pattern.scope !== 'noun_dependency') {
-      return;
-    }
-
-    const connector = pattern.pattern;
-    if (!connector) {
-      return;
-    }
-
-    for (let index = 0; index < tokens.length - 2; index += 1) {
-      const leftSequence = collectNounSequence(tokens, index);
-      if (!leftSequence.tokens.length) {
-        continue;
+        verbDependencies.push({
+          id: rule.id || '(no-id)',
+          type: rule.type || rule.id || 'verb_dependency',
+          source,
+          particle,
+          predicate,
+          expression: `${source}${particle}${predicate}`,
+          start: match.start,
+          end: match.end
+        });
+        return;
       }
 
-      const connectorIndex = leftSequence.endIndex;
-      if (!tokens[connectorIndex] || tokens[connectorIndex].surfaceForm !== connector) {
-        continue;
+      if (kind === 'noun') {
+        if (!sourceTokens.length || !connectorTokens.length || !targetTokens.length) {
+          return;
+        }
+
+        const source = joinSurface(sourceTokens);
+        const connector = joinSurface(connectorTokens);
+        const target = joinSurface(targetTokens);
+
+        nounDependencies.push({
+          id: rule.id || '(no-id)',
+          type: rule.type || rule.id || 'noun_dependency',
+          source,
+          connector,
+          target,
+          expression: `${source}${connector}${target}`,
+          start: match.start,
+          end: match.end
+        });
       }
-
-      const rightSequence = collectNounSequence(tokens, connectorIndex + 1);
-      if (!rightSequence.tokens.length) {
-        continue;
-      }
-
-      dependencies.push({
-        type: pattern.id || 'noun_dependency',
-        connector,
-        source: joinSurface(leftSequence.tokens),
-        target: joinSurface(rightSequence.tokens),
-        expression: `${joinSurface(leftSequence.tokens)}${connector}${joinSurface(rightSequence.tokens)}`
-      });
-    }
-  });
-
-  return dependencies;
-}
-
-function buildVerbDependencyGraph(verbDependencies) {
-  const nodes = [];
-  const edges = [];
-  const nodeById = new Map();
-
-  const ensureNode = (node) => {
-    if (nodeById.has(node.id)) {
-      return nodeById.get(node.id);
-    }
-
-    nodeById.set(node.id, node);
-    nodes.push(node);
-    return node;
-  };
-
-  verbDependencies.forEach((dependency) => {
-    const predicateId = createGraphNodeId('predicate', dependency.predicateIndex, dependency.predicate);
-    const argumentId = createGraphNodeId('argument', dependency.sourceIndex, dependency.source);
-
-    ensureNode({
-      id: predicateId,
-      kind: 'predicate',
-      label: dependency.predicate,
-      surface: dependency.predicate
-    });
-
-    ensureNode({
-      id: argumentId,
-      kind: 'argument',
-      label: dependency.source,
-      surface: dependency.source
-    });
-
-    edges.push({
-      id: `${argumentId}->${predicateId}:${dependency.particle}`,
-      from: argumentId,
-      to: predicateId,
-      label: dependency.particle,
-      expression: `${dependency.source}[${dependency.particle}]${dependency.predicate}`
     });
   });
 
   return {
-    kind: 'verb_dependency_graph',
-    nodes,
-    edges
+    verbDependencies: verbDependencies.sort((left, right) => left.start - right.start),
+    nounDependencies: nounDependencies.sort((left, right) => left.start - right.start)
   };
 }
 
-function buildGraphCoverage(tokens, verbDependencies) {
-  const adoptedIndexSet = new Set();
-  const roleMap = new Map();
+function renderTemplate(template, record) {
+  return String(template).replace(/\{([a-zA-Z0-9_]+)\}/g, (_all, key) => {
+    const value = record[key];
+    return value == null ? '' : String(value);
+  });
+}
 
-  const addRole = (tokenIndex, role) => {
-    if (!Number.isInteger(tokenIndex) || tokenIndex < 0 || tokenIndex >= tokens.length) {
+function applyRegexRules(records, rules, filePath, stage, ruleErrors, callback) {
+  sortRules(rules).forEach((rule) => {
+    if (!rule.pattern) {
       return;
     }
 
-    adoptedIndexSet.add(tokenIndex);
-    if (!roleMap.has(tokenIndex)) {
-      roleMap.set(tokenIndex, new Set());
+    let regex;
+    try {
+      regex = new RegExp(rule.pattern);
+    } catch (error) {
+      ruleErrors.push({
+        stage,
+        file: filePath,
+        ruleId: rule.id || '(no-id)',
+        message: error instanceof Error ? error.message : String(error)
+      });
+      return;
     }
-    roleMap.get(tokenIndex).add(role);
+
+    records.forEach((record) => {
+      if (!regex.test(record.expression)) {
+        return;
+      }
+
+      callback(record, rule);
+    });
+  });
+}
+
+function targetMatches(target, expected) {
+  if (!target || target === '*' || target === 'all') {
+    return true;
+  }
+
+  return target === expected;
+}
+
+function applyLabelRules(compounds, verbDependencies, nounDependencies, labelRules, ruleErrors) {
+  const apply = (records, expectedTarget) => {
+    const scopedRules = labelRules.filter((rule) => targetMatches(rule.target, expectedTarget));
+    applyRegexRules(records, scopedRules, 'config/postprocess/label-rules.csv', 'postprocess', ruleErrors, (record, rule) => {
+      record.label = rule.label || record.label;
+    });
   };
 
-  verbDependencies.forEach((dependency) => {
-    dependency.sourceTokenIndices.forEach((tokenIndex) => addRole(tokenIndex, 'argument'));
-    addRole(dependency.particleIndex, 'particle');
-    dependency.predicateTokenIndices.forEach((tokenIndex) => addRole(tokenIndex, 'predicate'));
-  });
+  apply(compounds, 'compound');
+  apply(verbDependencies, 'verb_dependency');
+  apply(nounDependencies, 'noun_dependency');
+}
 
-  const tokenCoverage = tokens.map((token, index) => {
-    const roles = roleMap.has(index) ? Array.from(roleMap.get(index)) : [];
-
-    return {
-      index,
-      surfaceForm: token.surfaceForm,
-      adopted: adoptedIndexSet.has(index),
-      roles
-    };
-  });
-
-  return {
-    segmentedText: tokens.map((token) => token.surfaceForm).join(' '),
-    adoptedCount: adoptedIndexSet.size,
-    totalCount: tokens.length,
-    tokenCoverage
+function applyDisplayRules(compounds, verbDependencies, nounDependencies, displayRules, ruleErrors) {
+  const apply = (records, expectedTarget) => {
+    const scopedRules = displayRules.filter((rule) => targetMatches(rule.target, expectedTarget));
+    applyRegexRules(records, scopedRules, 'config/postprocess/display-rules.csv', 'postprocess', ruleErrors, (record, rule) => {
+      record.display = renderTemplate(rule.template || '{expression}', record);
+    });
   };
+
+  apply(compounds, 'compound');
+  apply(verbDependencies, 'verb_dependency');
+  apply(nounDependencies, 'noun_dependency');
 }
 
 export async function runPostprocess(tokens) {
-  const compoundRules = await loadCsvConfig('config/postprocess/compound-rules.csv');
-  const dependencyRules = await loadCsvConfig('config/postprocess/dependency-rules.csv');
+  const [compoundRules, dependencyRules, labelRules, displayRules] = await Promise.all([
+    loadCsvConfig('config/postprocess/compound-rules.csv'),
+    loadCsvConfig('config/postprocess/dependency-rules.csv'),
+    loadCsvConfig('config/postprocess/label-rules.csv'),
+    loadCsvConfig('config/postprocess/display-rules.csv')
+  ]);
 
-  const prefixNounCompounds = compoundRules.some((rule) => asBoolean(rule.enabled) && rule.id === 'prefix_noun')
-    ? extractPrefixNounCompounds(tokens)
-    : [];
+  const ruleErrors = [];
+  const compounds = extractCompounds(tokens, compoundRules, ruleErrors);
+  const { verbDependencies, nounDependencies } = extractDependencies(tokens, dependencyRules, ruleErrors);
 
-  const nounSuruCompounds = compoundRules.some((rule) => asBoolean(rule.enabled) && rule.id === 'noun_suru')
-    ? extractNounSuruCompounds(tokens)
-    : [];
-
-  const consecutiveNounCompounds = compoundRules.some((rule) => asBoolean(rule.enabled) && rule.id === 'consecutive_nouns')
-    ? extractConsecutiveNounCompounds(tokens)
-    : [];
-
-  const verbDependencies = extractVerbDependencies(tokens, dependencyRules);
-  const nounDependencies = extractNounDependencies(tokens, dependencyRules);
-  const verbGraph = buildVerbDependencyGraph(verbDependencies);
-  const graphCoverage = buildGraphCoverage(tokens, verbDependencies);
+  applyLabelRules(compounds, verbDependencies, nounDependencies, labelRules, ruleErrors);
+  applyDisplayRules(compounds, verbDependencies, nounDependencies, displayRules, ruleErrors);
 
   return {
-    compounds: [...prefixNounCompounds, ...nounSuruCompounds, ...consecutiveNounCompounds],
+    compounds,
     verbDependencies,
     nounDependencies,
-    verbGraph,
-    graphCoverage
+    ruleErrors
   };
 }
